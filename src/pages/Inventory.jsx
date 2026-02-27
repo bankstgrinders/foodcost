@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getIngredients,
   getInventoryLevels,
@@ -10,9 +11,10 @@ import {
 } from '../lib/db';
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [ingredients, setIngredients] = useState([]);
   const [levels, setLevels] = useState([]);
-  const [tab, setTab] = useState('stock'); // stock | delivery | usage | log
+  const [tab, setTab] = useState('stock'); // stock | usage | log
   const [search, setSearch] = useState('');
   const [showLowOnly, setShowLowOnly] = useState(false);
 
@@ -143,9 +145,8 @@ export default function Inventory() {
   }
 
   // Quick action: log delivery/usage directly from stock row
-  function handleQuickDelivery(ingredientId) {
-    setActionIngredientId(ingredientId);
-    setTab('delivery');
+  function handleQuickDelivery() {
+    navigate('/import');
   }
 
   function handleQuickUsage(ingredientId) {
@@ -173,13 +174,13 @@ export default function Inventory() {
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 overflow-x-auto">
         {[
           { id: 'stock', label: 'Stock Levels' },
-          { id: 'delivery', label: 'Log Delivery' },
+          { id: 'delivery', label: 'Log Delivery', link: '/import' },
           { id: 'usage', label: 'Log Usage' },
           { id: 'log', label: 'History' },
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => t.link ? navigate(t.link) : setTab(t.id)}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
               tab === t.id
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -360,114 +361,6 @@ export default function Inventory() {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Delivery Tab */}
-      {tab === 'delivery' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Log a Delivery
-          </h2>
-          <form onSubmit={handleDelivery} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ingredient *
-              </label>
-              <div className="relative">
-                {actionIngredientId ? (
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1 border border-green-300 bg-green-50 rounded-lg px-3 py-2 text-sm text-gray-900">
-                      {getIngredientName(actionIngredientId)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActionIngredientId('')}
-                      className="text-gray-400 hover:text-gray-600 text-lg"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      type="text"
-                      value={pickerSearch}
-                      onChange={(e) => setPickerSearch(e.target.value)}
-                      onFocus={() => setPickerOpen(true)}
-                      onClick={() => setPickerOpen(true)}
-                      onBlur={() => setTimeout(() => setPickerOpen(false), 200)}
-                      placeholder="Click to browse or type to search..."
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                    />
-                    {pickerOpen && filteredPicker.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                        {filteredPicker.map((ing) => {
-                          const level = getLevelForIngredient(ing.id);
-                          return (
-                            <button
-                              key={ing.id}
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setActionIngredientId(ing.id);
-                                setPickerOpen(false);
-                                setPickerSearch('');
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex justify-between items-center border-b border-gray-50 last:border-0"
-                            >
-                              <span className="text-gray-900">
-                                {ing.displayName || ing.name}
-                              </span>
-                              <span className="text-xs text-gray-400">
-                                {level ? `${level.onHand} ${ing.purchaseUnit}` : '—'}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity *
-                </label>
-                <input
-                  type="number"
-                  required
-                  step="any"
-                  min="0"
-                  value={actionQty}
-                  onChange={(e) => setActionQty(e.target.value)}
-                  placeholder="e.g., 5"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Note
-                </label>
-                <input
-                  type="text"
-                  value={actionNote}
-                  onChange={(e) => setActionNote(e.target.value)}
-                  placeholder="e.g., Sysco order #1234"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={!actionIngredientId || !actionQty}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Log Delivery
-            </button>
-          </form>
         </div>
       )}
 
