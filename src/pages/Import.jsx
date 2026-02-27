@@ -1,60 +1,100 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseSyscoCSV } from '../lib/sysco-import';
+import { parsePeddlersPDF } from '../lib/peddlers-import';
 import { addIngredient, getIngredients, CATEGORIES } from '../lib/db';
 
+const VENDORS = [
+  {
+    id: 'sysco',
+    name: 'Sysco',
+    accept: '.csv,.txt',
+    description: 'Upload CSV from Sysco Shop → Order History',
+  },
+  {
+    id: 'peddlers',
+    name: "Peddler's Son",
+    accept: '.pdf',
+    description: 'Upload invoice PDF from Peddler\'s Son',
+  },
+  {
+    id: 'pepsi',
+    name: 'Pepsi',
+    accept: '.csv,.pdf,.txt',
+    description: 'Upload CSV or PDF from Pepsi (coming soon)',
+    disabled: true,
+  },
+  {
+    id: 'boarshead',
+    name: "Boar's Head",
+    accept: '.csv,.pdf,.txt',
+    description: 'Upload invoice (coming soon)',
+    disabled: true,
+  },
+];
+
 export default function Import() {
+  const [vendor, setVendor] = useState(null);
   const [parsed, setParsed] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [imported, setImported] = useState(false);
   const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  function handleFileUpload(e) {
+  async function handleFileUpload(e) {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || !vendor) return;
     setError('');
+    setLoading(true);
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const text = evt.target.result;
-        const items = parseSyscoCSV(text);
-        if (items.length === 0) {
-          setError(
-            'No items found in this file. Make sure it\'s a Sysco CSV export with product lines.'
-          );
-          return;
-        }
+    try {
+      let items = [];
 
-        // Check for duplicates against existing ingredients
-        const existing = getIngredients();
-        const existingSyscoIds = new Set(
-          existing
-            .filter((i) => i.syscoId)
-            .map((i) => i.syscoId)
-        );
-
-        items.forEach((item) => {
-          item._isDuplicate = existingSyscoIds.has(item.syscoId);
-        });
-
-        setParsed(items);
-        // Select all non-duplicates by default
-        setSelected(
-          new Set(
-            items
-              .filter((i) => !i._isDuplicate)
-              .map((_, idx) => idx)
-          )
-        );
-        setImported(false);
-      } catch (err) {
-        setError('Error reading file: ' + err.message);
+      if (vendor.id === 'sysco') {
+        const text = await file.text();
+        items = parseSyscoCSV(text);
+      } else if (vendor.id === 'peddlers') {
+        items = await parsePeddlersPDF(file);
       }
-    };
-    reader.readAsText(file);
+
+      if (items.length === 0) {
+        setError(
+          'No items found in this file. Make sure it matches the expected format for ' +
+            vendor.name +
+            '.'
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Check for duplicates against existing ingredients
+      const existing = getIngredients();
+      const existingVendorIds = new Set(
+        existing
+          .filter((i) => i.vendorId || i.syscoId)
+          .map((i) => i.vendorId || i.syscoId)
+      );
+
+      items.forEach((item) => {
+        const id = item.vendorId || item.syscoId;
+        item._isDuplicate = id ? existingVendorIds.has(id) : false;
+      });
+
+      setParsed(items);
+      setSelected(
+        new Set(
+          items
+            .filter((i) => !i._isDuplicate)
+            .map((_, idx) => idx)
+        )
+      );
+      setImported(false);
+    } catch (err) {
+      setError('Error reading file: ' + err.message);
+    }
+    setLoading(false);
   }
 
   function toggleItem(idx) {
@@ -87,8 +127,9 @@ export default function Import() {
       const item = parsed[idx];
       addIngredient({
         syscoId: item.syscoId,
+        vendorId: item.vendorId,
         name: item.name,
-        brand: item.brand,
+        brand: item.brand || '',
         category: item.category,
         purchaseUnit: item.purchaseUnit,
         purchaseSize: item.purchaseSize,
@@ -103,32 +144,95 @@ export default function Import() {
     setImported(true);
   }
 
+  function handleReset() {
+    setVendor(null);
+    setParsed([]);
+    setSelected(new Set());
+    setImported(false);
+    setError('');
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">
-        Import from Sysco
+        Import Ingredients
       </h1>
       <p className="text-sm text-gray-500 mb-6">
-        Upload a Sysco CSV order export to bulk-add ingredients.
+        Upload invoices from your vendors to bulk-add ingredients.
       </p>
 
+      {/* Vendor Selection */}
+      {!vendor && !imported && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">
+            Select Vendor
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {VENDORS.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => !v.disabled && setVendor(v)}
+                disabled={v.disabled}
+                className={`text-left bg-white rounded-xl border p-4 transition-all ${
+                  v.disabled
+                    ? 'border-gray-100 opacity-50 cursor-not-allowed'
+                    : 'border-gray-200 hover:border-green-300 hover:shadow-sm cursor-pointer'
+                }`}
+              >
+                <h3 className="font-medium text-gray-900">{v.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">{v.description}</p>
+                {v.disabled && (
+                  <span className="inline-block text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mt-2">
+                    Coming soon
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* File Upload */}
-      {!imported && (
-        <div className="mb-6">
+      {vendor && !imported && parsed.length === 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={handleReset}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              ← Back
+            </button>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Upload {vendor.name} Invoice
+            </h2>
+          </div>
+
           <label className="block">
             <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-green-400 transition-colors cursor-pointer">
-              <p className="text-3xl mb-2">📄</p>
-              <p className="font-medium text-gray-700">
-                Click to upload Sysco CSV
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Export from Sysco Shop → Order History → Download CSV
-              </p>
+              {loading ? (
+                <>
+                  <p className="text-3xl mb-2 animate-spin">⏳</p>
+                  <p className="font-medium text-gray-700">
+                    Reading file...
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-3xl mb-2">📄</p>
+                  <p className="font-medium text-gray-700">
+                    Click to upload {vendor.name} file
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {vendor.description}
+                  </p>
+                </>
+              )}
               <input
                 type="file"
-                accept=".csv,.txt"
+                accept={vendor.accept}
                 onChange={handleFileUpload}
                 className="hidden"
+                disabled={loading}
               />
             </div>
           </label>
@@ -138,6 +242,12 @@ export default function Import() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700">
           {error}
+          <button
+            onClick={handleReset}
+            className="block mt-2 text-red-600 underline text-xs"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -146,7 +256,7 @@ export default function Import() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6 text-center">
           <p className="text-3xl mb-2">✅</p>
           <h3 className="text-lg font-semibold text-green-800">
-            Imported {importCount} ingredients!
+            Imported {importCount} ingredients from {vendor?.name}!
           </h3>
           <p className="text-sm text-green-600 mt-1">
             They're now in your ingredients list.
@@ -159,11 +269,7 @@ export default function Import() {
               View Ingredients
             </button>
             <button
-              onClick={() => {
-                setParsed([]);
-                setSelected(new Set());
-                setImported(false);
-              }}
+              onClick={handleReset}
               className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors"
             >
               Import Another
@@ -177,10 +283,18 @@ export default function Import() {
         <>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Preview ({parsed.length} items found)
-              </h2>
-              <p className="text-xs text-gray-500">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleReset}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  ← Back
+                </button>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {vendor?.name} — {parsed.length} items found
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
                 {selected.size} selected for import
               </p>
             </div>
@@ -227,8 +341,13 @@ export default function Import() {
                       <span className="font-medium text-gray-900">
                         {item.name}
                       </span>
-                      <span className="text-xs text-gray-400">
-                        {item.brand}
+                      {item.brand && (
+                        <span className="text-xs text-gray-400">
+                          {item.brand}
+                        </span>
+                      )}
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                        {item.supplier}
                       </span>
                       {item._isDuplicate && (
                         <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
@@ -237,9 +356,12 @@ export default function Import() {
                       )}
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>Pack: {item.packSize}</span>
+                      {item.packSize && <span>Pack: {item.packSize}</span>}
                       <span>
-                        Cost: <b className="text-gray-700">${item.purchaseCost.toFixed(2)}</b>
+                        Cost:{' '}
+                        <b className="text-gray-700">
+                          ${item.purchaseCost.toFixed(2)}
+                        </b>
                         {item.perLb && ' (per-lb pricing)'}
                       </span>
                       <span>
