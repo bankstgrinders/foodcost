@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseSyscoCSV } from '../lib/sysco-import';
 import { parsePeddlersPDF } from '../lib/peddlers-import';
-import { addIngredient, getIngredients, CATEGORIES } from '../lib/db';
+import { addIngredient, updateIngredient, getIngredients, CATEGORIES } from '../lib/db';
 
 const VENDORS = [
   {
@@ -39,6 +39,7 @@ export default function Import() {
   const [selected, setSelected] = useState(new Set());
   const [imported, setImported] = useState(false);
   const [importCount, setImportCount] = useState(0);
+  const [updateCount, setUpdateCount] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -69,20 +70,31 @@ export default function Import() {
         return;
       }
 
-      // Check for duplicates against existing ingredients
+      // Check for duplicates and price changes against existing ingredients
       const existing = getIngredients();
-      const existingVendorIds = new Set(
-        existing
-          .filter((i) => i.vendorId || i.syscoId)
-          .map((i) => i.vendorId || i.syscoId)
-      );
+      const existingByVendorId = {};
+      existing.forEach((i) => {
+        const id = i.vendorId || i.syscoId;
+        if (id) existingByVendorId[id] = i;
+      });
 
       items.forEach((item) => {
         const id = item.vendorId || item.syscoId;
-        item._isDuplicate = id ? existingVendorIds.has(id) : false;
+        const match = id ? existingByVendorId[id] : null;
+        if (match) {
+          item._existingId = match.id;
+          item._oldPrice = match.purchaseCost;
+          const priceChanged = Math.abs(match.purchaseCost - item.purchaseCost) > 0.001;
+          item._priceChanged = priceChanged;
+          item._isDuplicate = !priceChanged; // only flag as duplicate if price is the same
+        } else {
+          item._isDuplicate = false;
+          item._priceChanged = false;
+        }
       });
 
       setParsed(items);
+      // Select all new items AND items with price changes
       setSelected(
         new Set(
           items
@@ -122,25 +134,38 @@ export default function Import() {
   }
 
   function handleImport() {
-    let count = 0;
+    let addedCount = 0;
+    let updatedCount = 0;
     for (const idx of selected) {
       const item = parsed[idx];
-      addIngredient({
-        syscoId: item.syscoId,
-        vendorId: item.vendorId,
-        name: item.name,
-        brand: item.brand || '',
-        category: item.category,
-        purchaseUnit: item.purchaseUnit,
-        purchaseSize: item.purchaseSize,
-        purchaseCost: item.purchaseCost,
-        costPerUnit: item.costPerUnit,
-        supplier: item.supplier,
-        notes: item.notes,
-      });
-      count++;
+      if (item._existingId) {
+        // Update existing item's price
+        updateIngredient(item._existingId, {
+          purchaseCost: item.purchaseCost,
+          purchaseSize: item.purchaseSize,
+          costPerUnit: item.costPerUnit,
+          notes: item.notes,
+        });
+        updatedCount++;
+      } else {
+        addIngredient({
+          syscoId: item.syscoId,
+          vendorId: item.vendorId,
+          name: item.name,
+          brand: item.brand || '',
+          category: item.category,
+          purchaseUnit: item.purchaseUnit,
+          purchaseSize: item.purchaseSize,
+          purchaseCost: item.purchaseCost,
+          costPerUnit: item.costPerUnit,
+          supplier: item.supplier,
+          notes: item.notes,
+        });
+        addedCount++;
+      }
     }
-    setImportCount(count);
+    setImportCount(addedCount);
+    setUpdateCount(updatedCount);
     setImported(true);
   }
 
@@ -149,6 +174,8 @@ export default function Import() {
     setParsed([]);
     setSelected(new Set());
     setImported(false);
+    setImportCount(0);
+    setUpdateCount(0);
     setError('');
   }
 
@@ -256,10 +283,13 @@ export default function Import() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6 text-center">
           <p className="text-3xl mb-2">✅</p>
           <h3 className="text-lg font-semibold text-green-800">
-            Imported {importCount} ingredients from {vendor?.name}!
+            {importCount > 0 && `Added ${importCount} new ingredient${importCount !== 1 ? 's' : ''}`}
+            {importCount > 0 && updateCount > 0 && ' and '}
+            {updateCount > 0 && `updated prices on ${updateCount} item${updateCount !== 1 ? 's' : ''}`}
+            {' '}from {vendor?.name}!
           </h3>
           <p className="text-sm text-green-600 mt-1">
-            They're now in your ingredients list.
+            Your ingredients list is up to date.
           </p>
           <div className="flex gap-3 justify-center mt-4">
             <button
@@ -323,7 +353,9 @@ export default function Import() {
                 key={idx}
                 className={`bg-white rounded-lg border p-4 transition-colors ${
                   item._isDuplicate
-                    ? 'border-amber-200 bg-amber-50'
+                    ? 'border-gray-200 bg-gray-50 opacity-60'
+                    : item._priceChanged
+                    ? 'border-blue-300 bg-blue-50'
                     : selected.has(idx)
                     ? 'border-green-300 bg-green-50'
                     : 'border-gray-200'
@@ -350,8 +382,13 @@ export default function Import() {
                         {item.supplier}
                       </span>
                       {item._isDuplicate && (
-                        <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
-                          Already imported
+                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                          No change
+                        </span>
+                      )}
+                      {item._priceChanged && (
+                        <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">
+                          Price update: ${item._oldPrice.toFixed(2)} → ${item.purchaseCost.toFixed(2)}
                         </span>
                       )}
                     </div>
