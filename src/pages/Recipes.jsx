@@ -43,6 +43,7 @@ export default function Recipes() {
 
   // For the ingredient picker in the form
   const [ingredientSearch, setIngredientSearch] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     setAllIngredients(getIngredients());
@@ -316,21 +317,27 @@ export default function Recipes() {
                   type="text"
                   value={ingredientSearch}
                   onChange={(e) => setIngredientSearch(e.target.value)}
-                  placeholder="Search to add an ingredient..."
+                  onFocus={() => setPickerOpen(true)}
+                  onBlur={() => setTimeout(() => setPickerOpen(false), 200)}
+                  placeholder="Click to browse or type to search ingredients..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                 />
-                {ingredientSearch && filteredPickerIngredients.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {filteredPickerIngredients.slice(0, 10).map((ingredient) => (
+                {pickerOpen && filteredPickerIngredients.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {filteredPickerIngredients.map((ingredient) => (
                       <button
                         key={ingredient.id}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() =>
                           handleAddIngredientToRecipe(ingredient.id)
                         }
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex justify-between items-center"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex justify-between items-center border-b border-gray-50 last:border-0"
                       >
-                        <span>{ingredient.name}</span>
+                        <div>
+                          <span className="text-gray-900">{ingredient.name}</span>
+                          <span className="text-xs text-gray-400 ml-2">{ingredient.category}</span>
+                        </div>
                         <span className="text-xs text-gray-400">
                           ${ingredient.costPerUnit.toFixed(4)}/
                           {ingredient.purchaseUnit}
