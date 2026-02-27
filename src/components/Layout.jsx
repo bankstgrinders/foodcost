@@ -6,6 +6,7 @@ const navItems = [
   { to: '/recipes', label: 'Recipes', icon: '📋' },
   { to: '/inventory', label: 'Inventory', icon: '📦' },
   { to: '/import', label: 'Import', icon: '📥' },
+  { to: '/waste', label: 'Waste', icon: '🗑️' },
 ];
 
 function NavItem({ to, label, icon }) {

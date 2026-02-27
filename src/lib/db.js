@@ -125,12 +125,28 @@ export function getWaste() {
 
 export function addWasteEntry(entry) {
   const db = getDB();
+  const qty = Number(entry.quantity) || 0;
   const newEntry = {
     id: generateId(),
     date: new Date().toISOString(),
     ...entry,
+    quantity: qty,
   };
   db.waste.push(newEntry);
+
+  // Deduct from inventory on-hand
+  const levelIndex = db.inventoryLevels.findIndex((i) => i.ingredientId === entry.ingredientId);
+  const timestamp = new Date().toISOString();
+
+  if (levelIndex !== -1) {
+    const level = db.inventoryLevels[levelIndex];
+    db.inventoryLevels[levelIndex] = {
+      ...level,
+      onHand: Math.max(0, (level.onHand || 0) - qty),
+      lastUpdated: timestamp,
+    };
+  }
+
   saveDB(db);
   return newEntry;
 }
