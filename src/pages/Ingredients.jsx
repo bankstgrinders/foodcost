@@ -27,6 +27,9 @@ export default function Ingredients() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editMenuOpen, setEditMenuOpen] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
 
   useEffect(() => {
     setIngredients(getIngredients());
@@ -83,6 +86,24 @@ export default function Ingredients() {
     setForm(emptyForm);
     setShowForm(false);
     setEditingId(null);
+  }
+
+  function handleRenameStart(ingredient) {
+    setRenamingId(ingredient.id);
+    setRenameValue(ingredient.displayName || '');
+    setEditMenuOpen(null);
+  }
+
+  function handleRenameSave(id) {
+    updateIngredient(id, { displayName: renameValue.trim() });
+    setRenamingId(null);
+    setRenameValue('');
+    refreshData();
+  }
+
+  function handleRenameCancel() {
+    setRenamingId(null);
+    setRenameValue('');
   }
 
   const filtered = ingredients.filter((i) => {
@@ -316,66 +337,131 @@ export default function Ingredients() {
           {filtered.map((ingredient) => (
             <div
               key={ingredient.id}
-              className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              className="bg-white rounded-lg border border-gray-200 overflow-hidden"
             >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-gray-900">
-                    {ingredient.displayName || ingredient.name}
-                  </span>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                    {ingredient.category}
-                  </span>
+              <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-900">
+                      {ingredient.displayName || ingredient.name}
+                    </span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                      {ingredient.category}
+                    </span>
+                  </div>
+                  {ingredient.displayName && (
+                    <p className="text-xs text-gray-400 mt-0.5">{ingredient.name}</p>
+                  )}
+                  <div className="text-sm text-gray-500 mt-1">
+                    ${ingredient.purchaseCost.toFixed(2)} / {ingredient.purchaseSize}{' '}
+                    {ingredient.purchaseUnit}
+                    <span className="mx-2">·</span>
+                    <span className="text-green-700 font-medium">
+                      ${ingredient.costPerUnit.toFixed(4)} per {ingredient.purchaseUnit}
+                    </span>
+                    {ingredient.supplier && (
+                      <>
+                        <span className="mx-2">·</span>
+                        {ingredient.supplier}
+                      </>
+                    )}
+                  </div>
                 </div>
-                {ingredient.displayName && (
-                  <p className="text-xs text-gray-400 mt-0.5">{ingredient.name}</p>
-                )}
-                <div className="text-sm text-gray-500 mt-1">
-                  ${ingredient.purchaseCost.toFixed(2)} / {ingredient.purchaseSize}{' '}
-                  {ingredient.purchaseUnit}
-                  <span className="mx-2">·</span>
-                  <span className="text-green-700 font-medium">
-                    ${ingredient.costPerUnit.toFixed(4)} per {ingredient.purchaseUnit}
-                  </span>
-                  {ingredient.supplier && (
-                    <>
-                      <span className="mx-2">·</span>
-                      {ingredient.supplier}
-                    </>
+                <div className="flex gap-2 items-center">
+                  <div className="relative">
+                    <button
+                      onClick={() =>
+                        setEditMenuOpen(
+                          editMenuOpen === ingredient.id ? null : ingredient.id
+                        )
+                      }
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50 transition-colors"
+                    >
+                      Edit ▾
+                    </button>
+                    {editMenuOpen === ingredient.id && (
+                      <div className="absolute right-0 z-20 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden w-40">
+                        <button
+                          onClick={() => handleRenameStart(ingredient)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleEdit(ingredient);
+                            setEditMenuOpen(null);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                        >
+                          Edit All Details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {deleteConfirm === ingredient.id ? (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleDelete(ingredient.id)}
+                        className="text-sm text-red-600 font-medium px-3 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        className="text-sm text-gray-600 font-medium px-2 py-1"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDeleteConfirm(ingredient.id)}
+                      className="text-sm text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEdit(ingredient)}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 rounded hover:bg-blue-50 transition-colors"
-                >
-                  Edit
-                </button>
-                {deleteConfirm === ingredient.id ? (
-                  <div className="flex gap-1">
+
+              {/* Inline Rename */}
+              {renamingId === ingredient.id && (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Display Name
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameSave(ingredient.id);
+                        if (e.key === 'Escape') handleRenameCancel();
+                      }}
+                      placeholder={ingredient.name}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                    />
                     <button
-                      onClick={() => handleDelete(ingredient.id)}
-                      className="text-sm text-red-600 font-medium px-3 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors"
+                      onClick={() => handleRenameSave(ingredient.id)}
+                      className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
                     >
-                      Confirm
+                      Save
                     </button>
                     <button
-                      onClick={() => setDeleteConfirm(null)}
-                      className="text-sm text-gray-600 font-medium px-2 py-1"
+                      onClick={handleRenameCancel}
+                      className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
                     >
-                      No
+                      Cancel
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirm(ingredient.id)}
-                    className="text-sm text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Vendor name: {ingredient.name}
+                  </p>
+                </div>
+              )}
             </div>
           ))}
         </div>
