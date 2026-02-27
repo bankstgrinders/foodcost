@@ -87,6 +87,7 @@ export default function Recipes() {
       ],
     });
     setIngredientSearch('');
+    setPickerOpen(false);
   }
 
   function handleRemoveIngredientFromRecipe(ingredientId) {
