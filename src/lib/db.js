@@ -8,6 +8,9 @@ const defaultData = {
   recipes: [],
   inventory: [],
   waste: [],
+  inventoryLevels: [],
+  deliveryLog: [],
+  usageLog: [],
 };
 
 function getDB() {
@@ -128,6 +131,131 @@ export function addWasteEntry(entry) {
   db.waste.push(newEntry);
   saveDB(db);
   return newEntry;
+}
+
+// ---- Inventory Levels ----
+
+export function getInventoryLevels() {
+  return getDB().inventoryLevels;
+}
+
+export function getInventoryLevel(ingredientId) {
+  const level = getDB().inventoryLevels.find((i) => i.ingredientId === ingredientId);
+  return level || null;
+}
+
+export function setInventoryLevel(ingredientId, { onHand, minLevel }) {
+  const db = getDB();
+  const index = db.inventoryLevels.findIndex((i) => i.ingredientId === ingredientId);
+  const timestamp = new Date().toISOString();
+
+  if (index !== -1) {
+    const existing = db.inventoryLevels[index];
+    const updated = {
+      ...existing,
+      onHand: onHand ?? existing.onHand ?? 0,
+      minLevel: minLevel ?? existing.minLevel ?? 0,
+      lastUpdated: timestamp,
+    };
+    db.inventoryLevels[index] = updated;
+    saveDB(db);
+    return updated;
+  }
+
+  const newEntry = {
+    id: generateId(),
+    ingredientId,
+    onHand: onHand ?? 0,
+    minLevel: minLevel ?? 0,
+    lastUpdated: timestamp,
+  };
+  db.inventoryLevels.push(newEntry);
+  saveDB(db);
+  return newEntry;
+}
+
+// ---- Delivery Log ----
+
+export function logDelivery({ ingredientId, quantity, note }) {
+  const db = getDB();
+  const qty = Number(quantity) || 0;
+  const entry = {
+    id: generateId(),
+    ingredientId,
+    quantity: qty,
+    date: new Date().toISOString(),
+    note: note || '',
+  };
+  db.deliveryLog.push(entry);
+
+  const levelIndex = db.inventoryLevels.findIndex((i) => i.ingredientId === ingredientId);
+  const timestamp = new Date().toISOString();
+
+  if (levelIndex !== -1) {
+    const level = db.inventoryLevels[levelIndex];
+    db.inventoryLevels[levelIndex] = {
+      ...level,
+      onHand: (level.onHand || 0) + qty,
+      lastUpdated: timestamp,
+    };
+  } else {
+    db.inventoryLevels.push({
+      id: generateId(),
+      ingredientId,
+      onHand: qty,
+      minLevel: 0,
+      lastUpdated: timestamp,
+    });
+  }
+
+  saveDB(db);
+  return entry;
+}
+
+export function getDeliveryLog() {
+  return getDB().deliveryLog;
+}
+
+// ---- Usage Log ----
+
+export function logUsage({ ingredientId, quantity, note }) {
+  const db = getDB();
+  const qty = Number(quantity) || 0;
+  const entry = {
+    id: generateId(),
+    ingredientId,
+    quantity: qty,
+    date: new Date().toISOString(),
+    note: note || '',
+  };
+  db.usageLog.push(entry);
+
+  const levelIndex = db.inventoryLevels.findIndex((i) => i.ingredientId === ingredientId);
+  const timestamp = new Date().toISOString();
+
+  if (levelIndex !== -1) {
+    const level = db.inventoryLevels[levelIndex];
+    db.inventoryLevels[levelIndex] = {
+      ...level,
+      onHand: Math.max(0, (level.onHand || 0) - qty),
+      lastUpdated: timestamp,
+    };
+  } else {
+    db.inventoryLevels.push({
+      id: generateId(),
+      ingredientId,
+      onHand: 0,
+      minLevel: 0,
+      lastUpdated: timestamp,
+    });
+  }
+
+  saveDB(db);
+  return entry;
+}
+
+export function getUsageLog() {
+  return getDB().usageLog;
 }
 
 // ---- Export/Import (for backup & moving between devices) ----
