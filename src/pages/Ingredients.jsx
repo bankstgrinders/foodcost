@@ -10,6 +10,7 @@ import {
 
 const emptyForm = {
   name: '',
+  displayName: '',
   category: CATEGORIES[0],
   purchaseUnit: UNITS[0],
   purchaseSize: '',
@@ -60,6 +61,7 @@ export default function Ingredients() {
   function handleEdit(ingredient) {
     setForm({
       name: ingredient.name,
+      displayName: ingredient.displayName || '',
       category: ingredient.category,
       purchaseUnit: ingredient.purchaseUnit,
       purchaseSize: ingredient.purchaseSize.toString(),
@@ -84,9 +86,10 @@ export default function Ingredients() {
   }
 
   const filtered = ingredients.filter((i) => {
-    const matchesSearch = i.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
+    const searchTerm = search.toLowerCase();
+    const matchesSearch =
+      i.name.toLowerCase().includes(searchTerm) ||
+      (i.displayName && i.displayName.toLowerCase().includes(searchTerm));
     const matchesCategory =
       filterCategory === 'All' || i.category === filterCategory;
     return matchesSearch && matchesCategory;
@@ -123,16 +126,30 @@ export default function Ingredients() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name *
+                  Vendor Name *
                 </label>
                 <input
                   type="text"
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g., Turkey Breast Smoked Fully Cooked"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none bg-gray-50"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Original name from invoice</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={form.displayName}
+                  onChange={(e) => setForm({ ...form, displayName: e.target.value })}
                   placeholder="e.g., Turkey Breast"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                 />
+                <p className="text-xs text-gray-400 mt-0.5">Your simplified name (shown everywhere in the app)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -304,12 +321,15 @@ export default function Ingredients() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-900">
-                    {ingredient.name}
+                    {ingredient.displayName || ingredient.name}
                   </span>
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                     {ingredient.category}
                   </span>
                 </div>
+                {ingredient.displayName && (
+                  <p className="text-xs text-gray-400 mt-0.5">{ingredient.name}</p>
+                )}
                 <div className="text-sm text-gray-500 mt-1">
                   ${ingredient.purchaseCost.toFixed(2)} / {ingredient.purchaseSize}{' '}
                   {ingredient.purchaseUnit}

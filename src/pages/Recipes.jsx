@@ -169,11 +169,15 @@ export default function Recipes() {
     setEditingId(null);
   }
 
-  // Filter the ingredient picker dropdown
+  // Filter the ingredient picker dropdown (search both display name and vendor name)
   const filteredPickerIngredients = allIngredients.filter(
-    (i) =>
-      i.name.toLowerCase().includes(ingredientSearch.toLowerCase()) &&
-      !form.ingredients.some((fi) => fi.ingredientId === i.id)
+    (i) => {
+      const searchTerm = ingredientSearch.toLowerCase();
+      const matchesName =
+        (i.displayName && i.displayName.toLowerCase().includes(searchTerm)) ||
+        i.name.toLowerCase().includes(searchTerm);
+      return matchesName && !form.ingredients.some((fi) => fi.ingredientId === i.id);
+    }
   );
 
   const filteredRecipes = recipes.filter((r) => {
@@ -337,7 +341,7 @@ export default function Recipes() {
                         className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex justify-between items-center border-b border-gray-50 last:border-0"
                       >
                         <div>
-                          <span className="text-gray-900">{ingredient.name}</span>
+                          <span className="text-gray-900">{ingredient.displayName || ingredient.name}</span>
                           <span className="text-xs text-gray-400 ml-2">{ingredient.category}</span>
                         </div>
                         <span className="text-xs text-gray-400">
@@ -372,7 +376,7 @@ export default function Recipes() {
                       className="px-4 py-2 grid grid-cols-12 gap-2 items-center border-t border-gray-100"
                     >
                       <span className="col-span-5 text-sm text-gray-900 truncate">
-                        {ingredient.name}
+                        {ingredient.displayName || ingredient.name}
                       </span>
                       <div className="col-span-2">
                         <input
@@ -639,7 +643,7 @@ export default function Recipes() {
                           className="flex justify-between text-sm py-1"
                         >
                           <span className="text-gray-700">
-                            {ingredient.name} — {ri.quantity} {ri.unit}
+                            {ingredient.displayName || ingredient.name} — {ri.quantity} {ri.unit}
                           </span>
                           <span className="text-gray-900 font-medium">
                             ${cost.toFixed(2)}
