@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Ingredients from './pages/Ingredients';
 import Recipes from './pages/Recipes';
 import Inventory from './pages/Inventory';
+import Import from './pages/Import';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/ingredients" element={<Ingredients />} />
           <Route path="/recipes" element={<Recipes />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/import" element={<Import />} />
         </Route>
       </Routes>
     </BrowserRouter>
