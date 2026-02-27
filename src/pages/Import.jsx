@@ -8,27 +8,23 @@ const VENDORS = [
   {
     id: 'sysco',
     name: 'Sysco',
-    accept: '.csv,.txt',
-    description: 'Upload CSV from Sysco Shop → Order History',
+    description: 'Upload invoice from Sysco',
   },
   {
     id: 'peddlers',
     name: "Peddler's Son",
-    accept: '.pdf',
-    description: 'Upload invoice PDF from Peddler\'s Son',
+    description: "Upload invoice from Peddler's Son",
   },
   {
     id: 'pepsi',
     name: 'Pepsi',
-    accept: '.csv,.pdf,.txt',
-    description: 'Upload CSV or PDF from Pepsi (coming soon)',
+    description: 'Upload invoice from Pepsi (coming soon)',
     disabled: true,
   },
   {
     id: 'boarshead',
     name: "Boar's Head",
-    accept: '.csv,.pdf,.txt',
-    description: 'Upload invoice (coming soon)',
+    description: "Upload invoice from Boar's Head (coming soon)",
     disabled: true,
   },
 ];
@@ -52,17 +48,33 @@ export default function Import() {
 
     try {
       let items = [];
+      const fileName = file.name.toLowerCase();
+      const isPDF = fileName.endsWith('.pdf') || file.type === 'application/pdf';
+      const isCSV = fileName.endsWith('.csv') || fileName.endsWith('.txt');
 
-      if (vendor.id === 'sysco') {
+      if (isPDF) {
+        items = await parsePeddlersPDF(file);
+      } else if (isCSV) {
         const text = await file.text();
         items = parseSyscoCSV(text);
-      } else if (vendor.id === 'peddlers') {
-        items = await parsePeddlersPDF(file);
+      } else {
+        // Try as text first, fall back to PDF
+        try {
+          const text = await file.text();
+          items = parseSyscoCSV(text);
+        } catch {
+          items = await parsePeddlersPDF(file);
+        }
       }
+
+      // Tag items with the selected vendor
+      items.forEach((item) => {
+        item.supplier = vendor.name;
+      });
 
       if (items.length === 0) {
         setError(
-          'No items found in this file. Make sure it matches the expected format for ' +
+          'No items found in this file. Make sure it\'s a CSV or PDF invoice from ' +
             vendor.name +
             '.'
         );
@@ -247,16 +259,16 @@ export default function Import() {
                 <>
                   <p className="text-3xl mb-2">📄</p>
                   <p className="font-medium text-gray-700">
-                    Click to upload {vendor.name} file
+                    Click to upload {vendor.name} invoice
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {vendor.description}
+                    CSV, PDF, or TXT — we'll figure out the format
                   </p>
                 </>
               )}
               <input
                 type="file"
-                accept={vendor.accept}
+                accept=".csv,.txt,.pdf"
                 onChange={handleFileUpload}
                 className="hidden"
                 disabled={loading}
