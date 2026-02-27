@@ -337,7 +337,7 @@ export default function Ingredients() {
           {filtered.map((ingredient) => (
             <div
               key={ingredient.id}
-              className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+              className={`bg-white rounded-lg border border-gray-200 ${editMenuOpen === ingredient.id || renamingId === ingredient.id ? 'relative z-30 overflow-visible' : 'overflow-hidden'}`}
             >
               <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex-1">
@@ -380,7 +380,7 @@ export default function Ingredients() {
                       Edit ▾
                     </button>
                     {editMenuOpen === ingredient.id && (
-                      <div className="absolute right-0 z-20 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden w-40">
+                      <div className="absolute right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden w-40">
                         <button
                           onClick={() => handleRenameStart(ingredient)}
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
