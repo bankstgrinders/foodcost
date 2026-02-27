@@ -17,7 +17,9 @@ function getDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (!raw) return { ...defaultData };
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    // Merge with defaults so new fields are always present
+    return { ...defaultData, ...data };
   } catch {
     return { ...defaultData };
   }
